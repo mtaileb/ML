@@ -263,3 +263,16 @@ spark-submit --master yarn-client \
 
 # Allez dans localhost:8088 pour voir son exécution dans YARN (raffraichissez régulièrement avec F5).
 
+# TP7: supprimons les lignes de plane-data.csv où il y a des données manquantes:
+# Créons un RDD et appliquons-lui un split:
+>>> planeRdd=sc.textFile("/user/root/plane-data.csv") \
+.map(lambda line: line.split(","))
+
+# Créons un accumulateur qui s'incrémente si une ligne ne contient pas les neuf champs:
+>>> badData=sc.accumulator(0)
+>>>def dataCheck(line,dataCounter):
+if len(line) != 9:
+dataCounter += 1
+
+# Imprimons les résultats à l'écran:
+>>>planeRdd.foreach(lambda line: dataCheck(line, badData))
