@@ -257,3 +257,9 @@ data=data.map(lambda i: i+1)
 
 
 # TP6: Construire et soumettre une application à YARN:
+# Exécutez le code suivant, qui soumet une application MostRatedBadMovieSpark.py avec deux Executors et 1Go par Executor:
+spark-submit --master yarn-client \
+--num-executors 2 --executor-memory MostRatedBadMovieSpark.py
+
+# Allez dans localhost:8088 pour voir son exécution dans YARN (raffraichissez régulièrement avec F5).
+
