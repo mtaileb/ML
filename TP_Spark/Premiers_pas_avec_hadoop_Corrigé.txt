@@ -1,0 +1,259 @@
+# TP1: premiers pas dans Hadoop et Spark
+
+su -l hdfs -c "hdfs dfsadmin"
+
+su -l hdfs -c "hdfs dfsadmin -report"
+
+jps
+
+# Essayons de nous connecter à Ambari, l'interface d'administration de Hadoop
+<aws_ip>:8080
+Username: admin
+Password: admin
+
+
+# hdfs dfs
+
+# hdfs dfs –ls
+
+# hdfs dfs –ls /
+
+# hdfs dfs -mkdir test
+
+# hdfs dfs -ls
+
+# hdfs dfs -mkdir test/test1
+
+# hdfs dfs -mkdir –p test/test2/test3
+
+# hdfs dfs -ls
+
+# hdfs dfs -ls -R
+
+# hdfs dfs -rm -R test
+# hdfs dfs -ls -R
+
+# cd /root/spark/data/
+
+# tail data.txt
+
+# hdfs dfs -put data.txt test/
+
+# hdfs dfs -ls test
+
+# hdfs dfs -cp test/data.txt test/test1/data2.txt
+
+# hdfs dfs -ls -R test
+
+# hdfs dfs -rm test/test1/data2.txt
+
+# hdfs dfs -cat test/data.txt
+
+# hdfs dfs -tail test/data.txt
+
+# hdfs dfs -getmerge test /tmp/merged.txt
+
+# hdfs dfs -tail test/merged.txt
+
+
+# Passons à spark:
+
+pyspark
+
+# cd ~/spark/data
+
+# tail selfishgiant.txt
+
+>>> baseRdd=sc.textFile("file:///root/spark/data/selfishgiant.txt")
+>>> baseRdd.take(1)
+>>> splitRdd = baseRdd.flatMap(lambda line: line.split(" "))
+>>> splitRdd.take(5)
+>>> mappedRdd = splitRdd.map(lambda line: (line,1))
+>>> mappedRdd.take(5)
+>>> reducedRdd = mappedRdd.reduceByKey(lambda a,b: a+b)
+>>> reducedRdd.take(20)
+>>> reducedRdd.collect()
+
+# A vous de jouer: trouvez les 10 mots les plus récurrents!
+
+
+# TP2: RDD avancés
+
+# Récupérez les fichiers suivants et mettez-les dans HDFS: flights.csv, airports.csv, carriers.csv, plane-data.csv
+
+hdfs dfs -head flights.csv
+
+# Créons un RDD pour flights.csv:
+>>> flightRdd=sc.textFile("/user/root/flights.csv").map(lambda line:line.split(","))
+
+>>> carrierRdd = flightRdd.map(lambda line: (line[5],1))
+>>> carrierRdd.take(1)
+
+# Faites un reduce pour obtenir le total de vols pour chaque compagnie aérienne, puis un sortBykey pour obtenir le Top 3.
+>>> cReducedRdd = carrierRdd.reduceByKey(lambda a,b: a+b)
+>>> carriersSorted.take(3)
+
+# Trouvons maintenant les 5 trajets les plus communs entre deux villes:
+>>> airportsRdd = sc.textFile("/user/root/airports.csv").map(lambdaline: line.split(","))
+
+# Préparons airportsRDD et flightsRDD pour garder uniquement les attributs utiles:
+>>> cityRdd = airportsRdd.map(lambda line: (line[0], line[2]))
+>>> flightOrigDestRdd = flightRdd.map(lambda line: (line[12],line[13]))
+
+# joignez les deux RDD pour obtenir la bonne ville, puis mapper citiesRDD dans u nouveau RDD qui fera un reduceBykey.
+>>> origJoinRdd = flightOrigDestRdd.join(cityRdd)
+>>> destAndOrigJoinRdd = origJoinRdd.map(lambda (a,b): (b[0],b[1])).join(cityRdd)
+>>> citiesCleanRdd = destAndOrigJoinRdd.values()
+
+# Challenge: trouvez le plus grand retard pour chaque airline s'il est supérieur à 15 minutes (ça sera similaire au wordcount! après une étape de filtre, au lieu de sommer des valeurs, comparez-les pour trouver la plus longue; astuce: max(a,b) retourne ma plus grande de deux valeurs int).
+>>> citiesReducedRdd = citiesCleanRdd.map(lambda line: (line,1)).reduceByKey(lambda a,b:a+b)
+>>> citiesReducedRdd.map(lambda (a,b): (b,a)).sortByKey(ascending=False).take(5)
+>>> flightRdd.filter(lambda line: int(line[11]) > 15) \
+.map(lambda line: (line[5], line[11])).reduceByKey(lambda a,b:max(int(a),int(b))).take(10)
+
+# Challenge: trouvez le modèle d'avion le plus commun pour les vols de plus de 1500 miles (penez à filtrer les observations contenant des valeurs manquantes).
+>>> airplanesRdd = sc.textFile("/user/root/plane-data.csv") \
+.map(lambda line: line.split(",")) \
+.filter(lambda line:len(line) == 9)
+>>> flight15Rdd = flightRdd \
+.filter(lambda line: int(line[14]) > 1500) \
+.map(lambda line: (line[7],1))
+>>> tailModelRdd = airplanesRdd \
+.map(lambda line: (line[0],line[4]))
+>>> flight15Rdd.join(tailModelRdd) \
+.map(lambda (a,b): (b[1],b[0])) \
+.reduceByKey(lambda a,b: a+b) \
+.map(lambda (a,b): (b,a)).sortByKey(ascending=False).take(2)
+
+
+# TP3: programmation parallèle avec Spark
+# Connectons-nous à l'UI de Spark: <addrese-IP>:4040
+# Créons deux RDD:
+>>>flightRdd=sc.textFile("/user/root/flights.csv") \
+.map(lambda line: line.split(","))
+>>>flightsKVRdd=flightRdd.map(##Key with 5th index, keep the 6thvalue)
+>>>flightsKVRdd.getNumPartitions()
+
+>>> carrierRdd = sc.textFile("/user/root/carriers.csv")\
+.map(lambda line: line.split(",")) \
+.map(lambda line: (line[0], line[1]))
+
+# Joignons les deux RDD:
+>>>joinedRdd = flightsKVRdd.join(carrierRdd)
+>>>joinedRdd.count()
+# Raffraichissez l'UI pour voir les tâ^ches s'exécuter.
+# Cliquez sur le DAG visualizer pour voir le DAG.
+# Notez les différentes métriques.
+
+# Répétez les étapes précédentes mais avec 10 partitions:
+>>>flightspartKVRdd=flightsKVRdd.repartition(10)
+>>>flightspartKVRdd.getNumPartitions()
+>>>flightspartKVRdd.join(carrierRdd).count()
+
+# Trouvez le nombre de vols en utilisant le RDD à 10 partitions.
+# Utilisez le reduceByKey, le pattern matching, et le sortByKey.
+# Collectez le résultat vers le Driver.
+# Raffraichissez l'UI.
+
+>>> flightspartKVRdd.map(lambda (a,b): (a,1)) \
+.reduceByKey(lambda a,b: a+b).join(carrierRdd) \
+.map(lambda (a,b): (b[0],b[1])) \
+.sortByKey(ascending=False).collect()
+
+
+TP4: Utilisation du cache pour accélérer la performance, et persistance des données:
+
+# Réalisez un .count() sur le RDD joinedRDD du TP précédant, et notez le temps qu'il prend:
+
+
+# Mettons maintenant joindRDD dans le cache:
+
+
+# Réalisons  nouveau un .count(), et notons le temps qu'il prend. Qu'en déduisez-vous?
+
+
+# Utilisons maintenant les options de persistance
+
+
+# Créons à noueau joinRDD:
+>>> flightRdd=sc.textFile("/user/root/flights.csv").map(lambda line:
+line.split(",")).map(lambda line: (line[5], line[6]))
+>>>carrierRdd = sc.textFile("/user/root/carriers.csv").map(lambda
+line: line.split(",")).map(lambda line: (line[0], line[1]))
+>>>joinedRdd = flightRdd.join(carrierRdd)
+
+# Importons les librairies nécessaires:
+>>>from pyspark import StorageLevel
+
+# En utilisant l'API persist, persistons le RDD avec MEMORY_ONLY:
+
+
+# Réaliser deux fois un .count() pour mettre les données en mémoire. Notez le temps du second .count().
+
+
+# En utilisant l'API unpersist, dépersister le RDD:
+
+
+# Re-persistez le avec cette fois-ci l'option DISK_ONLY:
+
+
+# Réalisez deux .count(). Quelle différence?
+
+
+
+# TP5: Checkpointing et RDD lineage:
+
+# Créons le RDD suivant:
+>>>data = sc.parallelize([1,2,3,4,5])
+
+# En utilisant l'API toDbugString(), voyons le lineage du RDD:
+
+
+# Créons une application itérative:
+>>>for x in range(100):
+if x%7 == 0:
+data.checkpoint()
+data=data.map(lambda i: i+1)
+>>>data.take(1)
+>>>print(data.toDebugString())
+# Réalisons une action:
+>>> data.take(1)
+
+# Voyons le lineage du dernier RDD:
+>>> print(data.toDebugString())
+
+# Réalisons un .count() sur le même RDD:
+
+
+# Augmentez le nombre d'itérations ci-dessus par incréments de 50 jusqu'à ce que toDebugString() retourne une erreur!
+
+# Maintenant faisons appel au checkpointing:
+# Activons le checkpointing:
+>>> sc.setCheckpointDir("checkpointDir")
+
+
+# Recréez les données de base:
+>>>data = sc.parallelize([1,2,3,4,5]
+
+# Il n'est pas nécessaire de checkpointer chaque itération: toutes les 7 itérations suffit:
+# Créez le checkpoint:
+>>>for x in range(1000):
+... ##Create the checkpoint
+...##Only do it every 7th iteration of i
+...data=data.map(lambda i: i+1)
+
+# Relancez la boucle loop jusqu'à 100, puis jusqu'au point où elle a retourné une erreur (exécutez ue action à chaque fois bien sûr).
+>>>for x in range(100):
+if x%7 == 0:
+data.checkpoint()
+data=data.map(lambda i: i+1)
+>>>data.take(1)
+>>>print(data.toDebugString())
+# Réalisons une action:
+>>> data.take(1)
+
+
+# Relancez le toDebugString. Alors, ça marche?
+
+
+# TP6: Construire et soumettre une application à YARN:
