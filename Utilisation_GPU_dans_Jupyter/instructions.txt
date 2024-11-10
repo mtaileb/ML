@@ -1,0 +1,18 @@
+# Installer Anaconda: https://www.anaconda.com/products/distribution
+# Tester l'installation de Conda/Jupyter avec:
+jupyter notebook
+# Installer la version de CUDA Toolkit adaptée à votre système/architecture/GPU: https://developer.nvidia.com/cuda-downloads
+# Tester l'installation de CUDA avec:
+nvidia-smi
+# Installer la librairie cuDNN en fonction de votre système et architecture: https://developer.nvidia.com/cudnn
+# Créer un environnement Conda:
+conda create --name gpu_env python=3.11
+# Installer les packages nécessaires pour interfacer Python avec CUDA:
+conda install -c anaconda tensorflow-gpu keras-gpu
+# Configurer Jupyter Notebook pour qu'il puisse utiliser l'environnement créé:
+python -m ipykernel install --user --name gpu_env --display-name "Python (GPU)"
+# Lancer Jupyter, puis sélectionner parmi les kernel celui créé précédemment
+jupyter notebook
+# Tester le nouvel environnement, le code suivant devrait retourner 'True':
+import torch
+torch.cuda.is_available()
