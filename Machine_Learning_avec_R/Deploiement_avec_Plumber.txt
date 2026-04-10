@@ -1,0 +1,71 @@
+Étape 1 : Entraîner et sauvegarder votre modèle
+
+Tout d'abord, vous avez besoin d'un modèle entraîné sauvegardé sous forme de fichier .rds.
+
+library(randomForest)
+
+# Entraîner un modèle en utilisant le jeu de données iris intégré
+model <- randomForest(Species ~ ., data = iris, ntree = 100)
+
+# Sauvegarder le modèle sur le disque
+saveRDS(model, "iris_model.rds")
+
+
+Étape 2 : Créer un script de scoring (plumber.R)
+
+Ce script contient la logique pour charger votre modèle et définir un point d'accès (endpoint) qui traitera les requêtes de prédiction.
+
+# plumber.R
+
+# Charger le modèle sauvegardé au démarrage de l'API
+model <- readRDS("iris_model.rds")
+
+#* @param Sepal.Length
+#* @param Sepal.Width
+#* @param Petal.Length
+#* @param Petal.Width
+#* @post /predict
+function(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width) {
+  # Créer un data frame à partir des entrées
+  new_data <- data.frame(
+    Sepal.Length = as.numeric(Sepal.Length),
+    Sepal.Width = as.numeric(Sepal.Width),
+    Petal.Length = as.numeric(Petal.Length),
+    Petal.Width = as.numeric(Petal.Width)
+  )
+  
+  # Générer la prédiction
+  prediction <- predict(model, new_data)
+  
+  # Retourner le résultat
+  list(species = as.character(prediction))
+}
+
+Les commentaires commençant par *@ sont des annotations plumber. @post /predict indique à plumber d'appeler cette fonction lorsqu'il reçoit une requête POST sur le chemin /predict.
+
+
+Étape 3 : Exécuter et tester localement
+
+Vous pouvez exécuter l'API sur votre propre ordinateur pour la tester avant de la déployer dans le cloud.
+
+library(plumber)
+
+# Créer un routeur plumber à partir de votre script
+pr <- plumb("plumber.R")
+
+# Démarrer l'API sur le port 8000
+pr$run(host = "0.0.0.0", port = 8000)
+
+Une fois l'API en cours d'exécution, vous pouvez la tester en envoyant une requête POST (par exemple, en utilisant le package httr) :
+
+library(httr)
+
+response <- POST("http://localhost:8000/predict",
+                 body = list(Sepal.Length = 5.1,
+                             Sepal.Width = 3.5,
+                             Petal.Length = 1.4,
+                             Petal.Width = 0.2),
+                 encode = "json")
+
+content(response)
+# Retourne : $species [1] "setosa"
